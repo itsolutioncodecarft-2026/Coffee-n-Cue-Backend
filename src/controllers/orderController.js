@@ -26,7 +26,14 @@ export async function listOrders(req, res, next) {
     const filter = {}
     if (status) filter.orderStatus = status
     if (paymentStatus) filter.paymentStatus = paymentStatus
-    if (search) filter.orderNumber = { $regex: search, $options: 'i' }
+    if (search) {
+      // Search by order number OR customer name OR table number
+      filter.$or = [
+        { orderNumber: { $regex: search, $options: 'i' } },
+        { customerName: { $regex: search, $options: 'i' } },
+        { tableNumber: { $regex: search, $options: 'i' } },
+      ]
+    }
     if (from || to) {
       filter.createdAt = {}
       if (from) filter.createdAt.$gte = new Date(from)

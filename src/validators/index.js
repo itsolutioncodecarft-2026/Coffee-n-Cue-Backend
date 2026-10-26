@@ -27,7 +27,7 @@ const orderItemSchema = z.object({
 })
 
 export const createOrderSchema = z.object({
-  customerName: z.string().max(100).optional().default(''),
+  customerName: z.string().min(1, 'Customer name is required').max(100),
   tableNumber: z.string().max(20).optional().default(''),
   orderType: z.enum(['dine-in', 'takeaway'], { message: 'Order type must be dine-in or takeaway' }),
   items: z.array(orderItemSchema).min(1, 'Order must have at least one item'),

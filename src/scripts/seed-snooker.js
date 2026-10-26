@@ -1,8 +1,12 @@
 /**
- * Seed Snooker/Billiards tables as menu items with customPrice=true.
+ * Seed Snooker/Pool tables as menu items with customPrice=true.
  * Price is entered by staff at order time based on time played.
  * Run: node src/scripts/seed-snooker.js
- * Idempotent — skips if "Snooker" category already exists.
+ * Run with --reset to clear and re-seed: node src/scripts/seed-snooker.js --reset
+ *
+ * Actual tables in Coffee N Cue:
+ *   - 3 Snooker Tables
+ *   - 1 Pool Table
  */
 import 'dotenv/config'
 import mongoose from 'mongoose'
@@ -16,7 +20,15 @@ function slugify(str) {
   return str.toLowerCase().trim().replace(/[^a-z0-9]+/g, '-')
 }
 
+const TABLES = [
+  { name: 'Snooker Table 1' },
+  { name: 'Snooker Table 2' },
+  { name: 'Snooker Table 3' },
+  { name: 'Pool Table 1' },
+]
+
 async function seed() {
+  const RESET = process.argv.includes('--reset')
   await mongoose.connect(MONGODB_URI)
   console.log('✅  Connected to MongoDB')
 
@@ -24,45 +36,37 @@ async function seed() {
   let category = await Category.findOne({ slug })
 
   if (!category) {
-    category = await Category.create({
-      name: 'Snooker',
-      slug,
-      sortOrder: 14,
-      isActive: true,
-    })
+    category = await Category.create({ name: 'Snooker', slug, sortOrder: 14, isActive: true })
     console.log('  ✓  Created Snooker category')
   } else {
     console.log('  ℹ️  Snooker category already exists')
   }
 
-  // Check if snooker items already exist
+  if (RESET) {
+    await MenuItem.deleteMany({ category: category._id })
+    console.log('  🗑️   Cleared existing table items')
+  }
+
   const existing = await MenuItem.countDocuments({ category: category._id })
-  if (existing > 0) {
-    console.log(`  ℹ️  ${existing} snooker items already exist. Skipping.`)
+  if (existing > 0 && !RESET) {
+    console.log(`  ℹ️  ${existing} table items already exist. Skipping.`)
+    console.log('     Run with --reset to re-seed: node src/scripts/seed-snooker.js --reset')
     await mongoose.disconnect()
     return
   }
 
-  // Create snooker table items with customPrice=true
-  const tables = [
-    { name: 'Snooker Table 1', price: 0 },
-    { name: 'Snooker Table 2', price: 0 },
-    { name: 'Snooker Table 3', price: 0 },
-    { name: 'Snooker Table 4', price: 0 },
-  ]
-
-  for (const t of tables) {
+  for (const t of TABLES) {
     await MenuItem.create({
       name: t.name,
       category: category._id,
-      price: t.price,
+      price: 0,
       customPrice: true,
       isAvailable: true,
     })
-    console.log(`  ✓  ${t.name} (custom price)`)
+    console.log(`  ✓  ${t.name} (custom price — staff enters charge at order time)`)
   }
 
-  console.log(`\n✅  Seeded ${tables.length} snooker tables (custom price items)`)
+  console.log(`\n✅  Seeded ${TABLES.length} tables (3 Snooker + 1 Pool)`)
   await mongoose.disconnect()
 }
 
