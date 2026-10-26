@@ -1,5 +1,6 @@
 import Payment from '../models/Payment.js'
 import Order from '../models/Order.js'
+import Customer from '../models/Customer.js'
 
 export async function recordPayment(req, res, next) {
   try {
@@ -45,6 +46,18 @@ export async function recordPayment(req, res, next) {
     }
 
     await order.save()
+
+    // Reduce customer outstanding balance (khata) if this order has a customer name
+    if (order.customerName && order.customerName.trim()) {
+      const customer = await Customer.findOne({
+        name: { $regex: `^${order.customerName.trim()}$`, $options: 'i' }
+      })
+      if (customer) {
+        customer.outstandingBalance = Math.max(0, customer.outstandingBalance - amount)
+        customer.totalPaid += amount
+        await customer.save()
+      }
+    }
 
     res.status(201).json({
       success: true,

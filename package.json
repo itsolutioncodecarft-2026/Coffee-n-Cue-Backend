@@ -11,6 +11,7 @@
     "dev": "node --watch src/server.js",
     "start": "node src/server.js",
     "seed": "node src/scripts/seed-menu.js",
+    "seed-snooker": "node src/scripts/seed-snooker.js",
     "seed-expense-categories": "node src/scripts/seed-expense-categories.js",
     "create-admin": "node src/scripts/create-admin.js"
   },

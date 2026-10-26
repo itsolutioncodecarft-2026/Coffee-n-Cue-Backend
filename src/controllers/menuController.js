@@ -32,12 +32,13 @@ export async function getMenuItem(req, res, next) {
 
 export async function createMenuItem(req, res, next) {
   try {
-    const { name, category, price, costPrice, isAvailable } = req.body
+    const { name, category, price, costPrice, customPrice, isAvailable } = req.body
     const cat = await Category.findById(category)
     if (!cat) return res.status(400).json({ success: false, message: 'Category not found' })
     const item = await MenuItem.create({
       name, category, price,
       costPrice: costPrice ?? null,
+      customPrice: customPrice ?? false,
       isAvailable: isAvailable ?? true,
     })
     const populated = await item.populate('category', 'name slug')
@@ -47,11 +48,12 @@ export async function createMenuItem(req, res, next) {
 
 export async function updateMenuItem(req, res, next) {
   try {
-    const { name, category, price, costPrice, isAvailable } = req.body
+    const { name, category, price, costPrice, customPrice, isAvailable } = req.body
     const update = {}
     if (name !== undefined) update.name = name
     if (price !== undefined) update.price = price
     if (costPrice !== undefined) update.costPrice = costPrice === '' ? null : costPrice
+    if (customPrice !== undefined) update.customPrice = customPrice
     if (isAvailable !== undefined) update.isAvailable = isAvailable
     if (category !== undefined) {
       const cat = await Category.findById(category)

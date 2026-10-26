@@ -14,13 +14,16 @@ export const categorySchema = z.object({
 export const menuItemSchema = z.object({
   name: z.string().min(1, 'Item name is required').max(200),
   category: z.string().min(1, 'Category is required'),
-  price: z.coerce.number().positive('Price must be a positive number'),
+  price: z.coerce.number().min(0, 'Price must be non-negative'),
+  costPrice: z.coerce.number().min(0).optional(),
+  customPrice: z.boolean().optional(),
   isAvailable: z.boolean().optional(),
 })
 
 const orderItemSchema = z.object({
   menuItemId: z.string().min(1),
-  quantity: z.coerce.number().int().positive('Quantity must be at least 1'),
+  quantity: z.coerce.number().int().positive('Quantity must be at least 1').optional().default(1),
+  customAmount: z.coerce.number().positive('Custom amount must be positive').optional(),
 })
 
 export const createOrderSchema = z.object({

@@ -1,6 +1,7 @@
 import Order from '../models/Order.js'
 import MenuItem from '../models/MenuItem.js'
 import { generateOrderNumber } from '../utils/orderNumber.js'
+import { upsertCustomerOnOrder } from '../controllers/customerController.js'
 
 const VALID_TRANSITIONS = {
   new: ['preparing', 'cancelled'],
@@ -84,16 +85,39 @@ export async function createOrder(req, res, next) {
         })
       }
       const quantity = Math.max(1, parseInt(item.quantity))
-      const lineTotal = menu.price * quantity
-      resolvedItems.push({
-        menuItemId: menu._id,
-        name: menu.name,
-        categoryName: menu.category?.name || '',
-        unitPrice: menu.price,
-        unitCost: menu.costPrice ?? null,   // snapshot cost price (null if unknown)
-        quantity,
-        lineTotal,
-      })
+
+      // Custom price items (e.g. snooker tables) — staff enters the actual amount
+      if (menu.customPrice) {
+        const customAmount = parseFloat(item.customAmount)
+        if (!customAmount || customAmount <= 0) {
+          return res.status(400).json({
+            success: false,
+            message: `Custom price required for "${menu.name}" — enter the actual amount`,
+          })
+        }
+        const lineTotal = customAmount  // custom items are quantity 1, price = customAmount
+        resolvedItems.push({
+          menuItemId: menu._id,
+          name: menu.name,
+          categoryName: menu.category?.name || '',
+          unitPrice: customAmount,
+          unitCost: null,
+          quantity: 1,
+          lineTotal,
+        })
+      } else {
+        // Normal items — use DB price
+        const lineTotal = menu.price * quantity
+        resolvedItems.push({
+          menuItemId: menu._id,
+          name: menu.name,
+          categoryName: menu.category?.name || '',
+          unitPrice: menu.price,
+          unitCost: menu.costPrice ?? null,
+          quantity,
+          lineTotal,
+        })
+      }
     }
 
     const subtotal = resolvedItems.reduce((s, i) => s + i.lineTotal, 0)
@@ -114,6 +138,11 @@ export async function createOrder(req, res, next) {
       orderStatus: 'new',
       paymentStatus: 'pending',
     })
+
+    // Track customer credit (khata) — if order has a customer name, add to their outstanding
+    if (customerName && customerName.trim()) {
+      await upsertCustomerOnOrder(customerName, total, order)
+    }
 
     res.status(201).json({ success: true, data: order, message: `Order ${orderNumber} created` })
   } catch (err) { next(err) }
@@ -173,25 +202,57 @@ export async function addItemsToOrder(req, res, next) {
         })
       }
       const quantity = Math.max(1, parseInt(item.quantity))
-      const lineTotal = menu.price * quantity
 
-      // If item already exists in order, increase quantity
-      const existing = order.items.find(
-        (i) => i.menuItemId?.toString() === menu._id.toString()
-      )
-      if (existing) {
-        existing.quantity += quantity
-        existing.lineTotal = existing.unitPrice * existing.quantity
+      if (menu.customPrice) {
+        const customAmount = parseFloat(item.customAmount)
+        if (!customAmount || customAmount <= 0) {
+          return res.status(400).json({
+            success: false,
+            message: `Custom price required for "${menu.name}"`,
+          })
+        }
+        const existing = order.items.find((i) => i.menuItemId?.toString() === menu._id.toString())
+        if (existing) {
+          // For custom items, we add as a new line (each play session is separate)
+          order.items.push({
+            menuItemId: menu._id,
+            name: menu.name,
+            categoryName: menu.category?.name || '',
+            unitPrice: customAmount,
+            unitCost: null,
+            quantity: 1,
+            lineTotal: customAmount,
+          })
+        } else {
+          order.items.push({
+            menuItemId: menu._id,
+            name: menu.name,
+            categoryName: menu.category?.name || '',
+            unitPrice: customAmount,
+            unitCost: null,
+            quantity: 1,
+            lineTotal: customAmount,
+          })
+        }
       } else {
-        order.items.push({
-          menuItemId: menu._id,
-          name: menu.name,
-          categoryName: menu.category?.name || '',
-          unitPrice: menu.price,
-          unitCost: menu.costPrice ?? null,
-          quantity,
-          lineTotal,
-        })
+        const lineTotal = menu.price * quantity
+        const existing = order.items.find(
+          (i) => i.menuItemId?.toString() === menu._id.toString()
+        )
+        if (existing) {
+          existing.quantity += quantity
+          existing.lineTotal = existing.unitPrice * existing.quantity
+        } else {
+          order.items.push({
+            menuItemId: menu._id,
+            name: menu.name,
+            categoryName: menu.category?.name || '',
+            unitPrice: menu.price,
+            unitCost: menu.costPrice ?? null,
+            quantity,
+            lineTotal,
+          })
+        }
       }
     }
 

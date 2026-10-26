@@ -13,6 +13,7 @@ import dashboardRoutes from './routes/dashboard.js'
 import reportRoutes from './routes/reports.js'
 import expenseRoutes from './routes/expenses.js'
 import expenseCategoryRoutes from './routes/expenseCategories.js'
+import customerRoutes from './routes/customers.js'
 import { errorHandler, notFound } from './middleware/errorHandler.js'
 
 const app = express()
@@ -75,6 +76,7 @@ app.use('/api/dashboard', dashboardRoutes)
 app.use('/api/reports', reportRoutes)
 app.use('/api/expenses', expenseRoutes)
 app.use('/api/expense-categories', expenseCategoryRoutes)
+app.use('/api/customers', customerRoutes)
 
 // ── 404 & Error handling ───────────────────────────────────────────────
 app.use(notFound)
