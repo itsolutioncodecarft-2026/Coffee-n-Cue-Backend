@@ -3,8 +3,13 @@ import jwt from 'jsonwebtoken'
 const JWT_SECRET = process.env.JWT_SECRET
 
 export function requireAuth(req, res, next) {
-  // Accept token from HTTP-only cookie or Authorization header
-  const token = req.cookies?.cnc_auth || extractBearerToken(req)
+  // 1. Try HTTP-only cookie first
+  const cookieToken = req.cookies?.cnc_auth
+
+  // 2. Fall back to Authorization Bearer header (used when cookie is blocked cross-domain)
+  const bearerToken = extractBearerToken(req)
+
+  const token = cookieToken || bearerToken
 
   if (!token) {
     return res.status(401).json({ success: false, message: 'Authentication required' })
@@ -14,7 +19,7 @@ export function requireAuth(req, res, next) {
     const decoded = jwt.verify(token, JWT_SECRET)
     req.admin = decoded
     next()
-  } catch (err) {
+  } catch {
     return res.status(401).json({ success: false, message: 'Invalid or expired session' })
   }
 }

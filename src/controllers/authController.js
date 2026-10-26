@@ -6,12 +6,15 @@ const JWT_EXPIRES_IN = process.env.JWT_EXPIRES_IN || '7d'
 const COOKIE_NAME = 'cnc_auth'
 const COOKIE_MAX_AGE = 7 * 24 * 60 * 60 * 1000 // 7 days in ms
 
-function cookieOptions(remember = true) {
+function cookieOptions() {
+  const isProd = process.env.NODE_ENV === 'production'
   return {
     httpOnly: true,
-    sameSite: 'lax',
-    secure: process.env.NODE_ENV === 'production',
-    maxAge: remember ? COOKIE_MAX_AGE : undefined,
+    // Cross-domain (Vercel frontend → Render backend) requires SameSite=None + Secure
+    // In development (same origin) lax works fine
+    sameSite: isProd ? 'none' : 'lax',
+    secure: isProd ? true : false,
+    maxAge: COOKIE_MAX_AGE,
     path: '/',
   }
 }
@@ -36,11 +39,13 @@ export async function login(req, res, next) {
       { expiresIn: JWT_EXPIRES_IN }
     )
 
-    res.cookie(COOKIE_NAME, token, cookieOptions(true))
+    res.cookie(COOKIE_NAME, token, cookieOptions())
 
     return res.json({
       success: true,
       message: 'Login successful',
+      // Also return token in body so frontend can store as fallback if cookie is blocked
+      token,
       admin: { id: admin._id, email: admin.email, username: admin.username },
     })
   } catch (err) {
@@ -49,12 +54,16 @@ export async function login(req, res, next) {
 }
 
 export async function logout(req, res) {
-  res.clearCookie(COOKIE_NAME, { path: '/' })
+  const isProd = process.env.NODE_ENV === 'production'
+  res.clearCookie('cnc_auth', {
+    path: '/',
+    sameSite: isProd ? 'none' : 'lax',
+    secure: isProd,
+  })
   res.json({ success: true, message: 'Logged out' })
 }
 
 export async function me(req, res) {
-  // req.admin is set by requireAuth middleware
   const { id, email, username } = req.admin
   res.json({ success: true, admin: { id, email, username } })
 }
