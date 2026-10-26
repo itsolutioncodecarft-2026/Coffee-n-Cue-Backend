@@ -140,6 +140,83 @@ export async function updateOrderStatus(req, res, next) {
   } catch (err) { next(err) }
 }
 
+export async function addItemsToOrder(req, res, next) {
+  try {
+    const order = await Order.findById(req.params.id)
+    if (!order) return res.status(404).json({ success: false, message: 'Order not found' })
+    if (order.orderStatus === 'cancelled') {
+      return res.status(400).json({ success: false, message: 'Cannot add items to a cancelled order' })
+    }
+    if (order.orderStatus === 'served') {
+      return res.status(400).json({ success: false, message: 'Cannot add items to a served order' })
+    }
+
+    const { items } = req.body
+    if (!items || items.length === 0) {
+      return res.status(400).json({ success: false, message: 'No items provided' })
+    }
+
+    // Resolve from DB — never trust client prices
+    const menuItemIds = items.map((i) => i.menuItemId)
+    const menuItems = await MenuItem.find({ _id: { $in: menuItemIds }, isAvailable: true })
+      .populate('category', 'name')
+      .lean()
+
+    const menuMap = Object.fromEntries(menuItems.map((m) => [m._id.toString(), m]))
+
+    for (const item of items) {
+      const menu = menuMap[item.menuItemId]
+      if (!menu) {
+        return res.status(400).json({
+          success: false,
+          message: `Item "${item.menuItemId}" is not available`,
+        })
+      }
+      const quantity = Math.max(1, parseInt(item.quantity))
+      const lineTotal = menu.price * quantity
+
+      // If item already exists in order, increase quantity
+      const existing = order.items.find(
+        (i) => i.menuItemId?.toString() === menu._id.toString()
+      )
+      if (existing) {
+        existing.quantity += quantity
+        existing.lineTotal = existing.unitPrice * existing.quantity
+      } else {
+        order.items.push({
+          menuItemId: menu._id,
+          name: menu.name,
+          categoryName: menu.category?.name || '',
+          unitPrice: menu.price,
+          unitCost: menu.costPrice ?? null,
+          quantity,
+          lineTotal,
+        })
+      }
+    }
+
+    // Recalculate totals
+    const newSubtotal = order.items.reduce((s, i) => s + i.lineTotal, 0)
+    const addedAmount = newSubtotal - order.subtotal
+    order.subtotal = newSubtotal
+    order.total = newSubtotal
+    order.outstandingAmount = parseFloat((order.total - order.totalPaid).toFixed(2))
+
+    // Update payment status if needed
+    if (order.outstandingAmount > 0 && order.paymentStatus === 'paid') {
+      order.paymentStatus = 'partial'
+    }
+
+    await order.save()
+
+    res.json({
+      success: true,
+      data: order,
+      message: `Items added. New total: ₹${order.total}`,
+    })
+  } catch (err) { next(err) }
+}
+
 export async function cancelOrder(req, res, next) {
   try {
     const { reason } = req.body
