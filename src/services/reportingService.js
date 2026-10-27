@@ -78,15 +78,15 @@ export async function getSummary(start, end) {
       orderStatus: { $ne: 'cancelled' },
     }),
 
-    // Collections from payment ledger (by paidAt)
+    // Collections from payment ledger (by paidAt) — exclude credit entries
     Payment.aggregate([
-      { $match: { paidAt: { $gte: start, $lt: end }, isRefund: false } },
+      { $match: { paidAt: { $gte: start, $lt: end }, isRefund: false, method: { $ne: 'credit' } } },
       { $group: { _id: '$method', total: { $sum: '$amount' } } },
     ]),
 
-    // Refunds (by paidAt)
+    // Refunds (by paidAt) — exclude credit
     Payment.aggregate([
-      { $match: { paidAt: { $gte: start, $lt: end }, isRefund: true } },
+      { $match: { paidAt: { $gte: start, $lt: end }, isRefund: true, method: { $ne: 'credit' } } },
       { $group: { _id: null, total: { $sum: '$amount' } } },
     ]),
 

@@ -36,7 +36,7 @@ export const createOrderSchema = z.object({
 
 export const paymentSchema = z.object({
   amount: z.coerce.number().positive('Amount must be positive'),
-  method: z.enum(['cash', 'upi'], { message: 'Method must be cash or upi' }),
+  method: z.enum(['cash', 'upi', 'credit'], { message: 'Method must be cash, upi, or credit' }),
   transactionRef: z.string().max(200).optional().default(''),
   notes: z.string().max(500).optional().default(''),
 })

@@ -4,7 +4,7 @@ const PaymentSchema = new mongoose.Schema(
   {
     order: { type: mongoose.Schema.Types.ObjectId, ref: 'Order', required: true },
     amount: { type: Number, required: true, min: 0 },
-    method: { type: String, enum: ['cash', 'upi'], required: true },
+    method: { type: String, enum: ['cash', 'upi', 'credit'], required: true },
     transactionRef: { type: String, default: '', trim: true },
     notes: { type: String, default: '' },
     paidAt: { type: Date, default: Date.now },
